@@ -58,23 +58,6 @@ def extract_full_text(soup, debug=False):
         paragraphs = article_container.find_all("p")
         if debug:
             print(f"Found {len(paragraphs)} paragraphs inside #article container.")
-    else:
-        # Try multiple possible selectors for article content
-        content_selectors = [
-            "div.articlePage p",
-            "div.WYSIWYG p",
-            "div.articleText p",
-            "div.content-section p",
-            "article p",
-            "p",  # Fallback to any paragraph
-        ]
-
-        for selector in content_selectors:
-            paragraphs = soup.select(selector)
-            if paragraphs:
-                if debug:
-                    print(f"Found {len(paragraphs)} paragraphs using selector: {selector}")
-                break
 
     # Filtrar párrafos irrelevantes (muy cortos) y excluir el último
     filtered_paragraphs = [
