@@ -6,6 +6,9 @@ import json
 import os
 from urllib.parse import urlparse, urljoin
 from datetime import datetime
+import sys
+
+sys.stdout.reconfigure(encoding="utf-8")
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
@@ -143,7 +146,7 @@ def load_existing_data(filename="news_data.json"):
         print(f"Error loading existing data: {str(e)}")
         return []
 
-def save_to_json(data, filename="news_data.json"):
+def save_to_json(data, filename="investing_news_data.json"):
     """Save the article data to a JSON file"""
     with open(os.path.join(__location__, filename), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -216,9 +219,8 @@ async def main():
                 new_articles += 1
                 processed_count += 1
 
-                print(
-                    f"Scraped article {processed_count}: {article_data['headline']} ({article_data['category']})"
-                )
+                print(f"Scraped article {processed_count}: {article_data['headline']} ({article_data['category']})".encode("utf-8", "replace").decode("utf-8"))
+                ##print(f"Scraped article {processed_count}: {article_data['headline']} ({article_data['category']})")
 
                 # Save after each successful scrape for resilience
                 if new_articles % 5 == 0:
