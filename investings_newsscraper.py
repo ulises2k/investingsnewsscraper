@@ -6,6 +6,7 @@ import json
 import os
 from urllib.parse import urlparse, urljoin
 
+__location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 def identify_category(soup, url, debug=False):
     """Extract category using enhanced logic from single_article_scraper"""
@@ -51,35 +52,40 @@ def extract_full_text(soup, debug=False):
     """Extract full text using enhanced logic from single_article_scraper"""
     paragraphs = []
 
-    # Try multiple possible selectors for article content
-    content_selectors = [
-        "div.articlePage p",
-        "div.WYSIWYG p",
-        "div.articleText p",
-        "div.content-section p",
-        "article p",
-        "p",  # Fallback to any paragraph
+    # Primero intentamos encontrar el contenedor con id="article"
+    article_container = soup.find(id="article")
+    if article_container:
+        paragraphs = article_container.find_all("p")
+        if debug:
+            print(f"Found {len(paragraphs)} paragraphs inside #article container.")
+    else:
+        # Try multiple possible selectors for article content
+        content_selectors = [
+            "div.articlePage p",
+            "div.WYSIWYG p",
+            "div.articleText p",
+            "div.content-section p",
+            "article p",
+            "p",  # Fallback to any paragraph
+        ]
+
+        for selector in content_selectors:
+            paragraphs = soup.select(selector)
+            if paragraphs:
+                if debug:
+                    print(f"Found {len(paragraphs)} paragraphs using selector: {selector}")
+                break
+
+    # Filtrar párrafos irrelevantes (muy cortos) y excluir el último
+    filtered_paragraphs = [
+        p for p in paragraphs[:-1] if len(p.get_text(strip=True)) > 20
     ]
 
-    for selector in content_selectors:
-        paragraphs = soup.select(selector)
-        if paragraphs:
-            if debug:
-                print(f"Found {len(paragraphs)} paragraphs using selector: {selector}")
-            break
-
-    # Filter out non-article paragraphs (typically shorter than 20 chars)
-    # Also exclude last paragraph.
-    paragraphs = [
-        p
-        for p in paragraphs[:-1]
-        if len(p.text.strip()) > 20
-    ]
-
-    # Extract and join the text from paragraphs
-    full_text = " ".join([p.text.strip() for p in paragraphs])
+    # Unir el texto
+    full_text = " ".join(p.get_text(strip=True) for p in filtered_paragraphs)
 
     return full_text
+
 
 
 async def scrape_article(session, link, debug=False):
@@ -124,25 +130,22 @@ async def scrape_article(session, link, debug=False):
         print(f"Error scraping {link}: {str(e)}")
         return None
 
-
 def load_existing_data(filename="news_data.json"):
     """Load existing article data from file if it exists"""
     try:
-        if os.path.exists(filename):
-            with open(filename, "r", encoding="utf-8") as f:
+        if os.path.exists(os.path.join(__location__, filename)):
+            with open(os.path.join(__location__, filename), "r", encoding="utf-8") as f:
                 return json.load(f)
         return []
     except Exception as e:
         print(f"Error loading existing data: {str(e)}")
         return []
 
-
 def save_to_json(data, filename="news_data.json"):
     """Save the article data to a JSON file"""
-    with open(filename, "w", encoding="utf-8") as f:
+    with open(os.path.join(__location__, filename), "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     print(f"Article data saved to {filename}")
-
 
 async def main():
     # Command line argument for debug mode
@@ -182,22 +185,22 @@ async def main():
 
         for i, card in enumerate(cards):
             try:
-                # Use more reliable selectors with fallbacks
-                title_elem = card.find(
-                    "a", class_=lambda x: x and "text-inv-blue-500" in x
-                )
-                if not title_elem:
+                # Buscar el enlace dentro de la tarjeta
+                link_elem = card.find("a", href=True)
+                if not link_elem:
                     continue
 
-                # Get link
-                relative_link = title_elem["href"]
+                # Obtener el enlace completo
+                relative_link = link_elem.get("href")
                 link = urljoin("https://www.investing.com", relative_link)
 
-                # Skip if already scraped
+                # Verificar si ya fue procesado
                 if link in existing_urls:
-                    print(
-                        f"Skipping already scraped article: {title_elem.text.strip()}"
-                    )
+                    continue
+
+                # Obtener el título del artículo
+                title = link_elem.get_text(strip=True)
+                if not title:
                     continue
 
                 # Scrape article details with error handling
