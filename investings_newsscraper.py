@@ -1,10 +1,11 @@
-from curl_cffi.requests import AsyncSession
+from curl_cffi.requests import AsyncSession # pyright: ignore[reportMissingImports]
 from bs4 import BeautifulSoup
 import asyncio
 import time
 import json
 import os
 from urllib.parse import urlparse, urljoin
+from datetime import datetime
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
@@ -70,7 +71,6 @@ def extract_full_text(soup, debug=False):
     return full_text
 
 
-
 async def scrape_article(session, link, debug=False):
     """Scrape a single article with improved handling from single_article_scraper"""
     try:
@@ -102,12 +102,31 @@ async def scrape_article(session, link, debug=False):
         # Extract full text using enhanced method
         full_text = extract_full_text(soup, debug)
 
+        # Extract published and updated dates
+        published = None
+        updated = None
+
+        # Buscar todos los divs con la clase específica
+        date_divs = soup.find_all("div", class_="flex flex-row items-center")
+        for div in date_divs:
+            span = div.find("span")
+            if span:
+                text = span.text.strip()
+                if "Published" in text:
+                    # Extraer la parte de la fecha
+                    date_str = text.replace("Published", "").strip()
+                    try:
+                        dt = datetime.strptime(date_str, "%m/%d/%Y, %I:%M %p")
+                        published = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    except ValueError as ve:
+                        print(f"Error parsing published date: {ve}")
         return {
             "headline": title,
             "category": category,
             "full_text": full_text,
             "url": link,
             "scraped_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "published": published,
         }
     except Exception as e:
         print(f"Error scraping {link}: {str(e)}")
